@@ -1,0 +1,22 @@
+# MCUXpresso / Eclipse CDT build output directories
+Debug/
+Release/
+
+# GCC ARM compiler intermediate and artifact files
+*.o
+*.d
+*.axf
+*.bin
+*.hex
+*.map
+*.launch
+
+# Eclipse temporary index and history
+.metadata/
+.recommenders/
+*.tmp
+*~
+
+# Operating system files
+.DS_Store
+Thumbs.db
