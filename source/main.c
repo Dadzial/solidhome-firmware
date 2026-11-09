@@ -7,7 +7,7 @@
 
 /**
  * @file    main.c
- * @brief   Application entry point.
+ * @brief   Application entry point for SolidHome.
  */
 #include <stdio.h>
 #include "board.h"
@@ -18,6 +18,7 @@
 #include "wlan_mwm.h"
 #include "lights.h"
 #include "air.h"
+#include "mqtt_client.h"
 
 /*******************************************************************************
  * Definitions
@@ -31,9 +32,16 @@
  4 - WPA2-PSK
  9 - WPA3-SAE
  ----------------------------------------------------------------------------*/
-#define AP_SSID          "your-wifi-ssid"
-#define AP_PASSPHRASE    "your-wifi-password"
+#define AP_SSID          ""
+#define AP_PASSPHRASE    ""
 #define AP_SECURITY_MODE "4"
+
+#define MQTT_BROKER_HOST       "broker.emqx.io"
+#define MQTT_BROKER_PORT       1883
+#define MQTT_CLIENT_ID         "solidhome_nxp_board"
+#define MQTT_TOPIC_LIGHTS_SET  "solidhome/api/lights/set"
+
+static mqtt_client_t g_mqtt_client;
 
 int main(void) {
 	BOARD_InitBootPins();
@@ -43,19 +51,30 @@ int main(void) {
 	BOARD_InitDebugConsole();
 #endif
 
+	/** Polaczenie z siecia */
 	wlan_init(LP_FLEXCOMM5_PERIPHERAL, AP_SSID, AP_PASSPHRASE, AP_SECURITY_MODE);
 	while (wlan_get_state() != MWM_CONNECTED);
 	wlan_state();
 
 	lights_init();
 
-	PRINTF("SolidHome Autonomous Sync Started...\r\n");
+	/* Inicializacja i polaczenie z brokerem */
+	mqtt_client_init(&g_mqtt_client, MQTT_BROKER_HOST, MQTT_BROKER_PORT, MQTT_CLIENT_ID);
 
-	lights_sync_status(); // first sync
+	if (mqtt_client_connect(&g_mqtt_client) == 0) {
+		mqtt_client_subscribe(&g_mqtt_client, MQTT_TOPIC_LIGHTS_SET, lights_mqtt_handler);
+	}
+
+	PRINTF("Starting event loop...\r\n");
+
+	uint32_t simulated_tick_ms = 0;
 
 	while (1) {
-		lights_sync_status();
-		SDK_DelayAtLeastUs(500000U, SystemCoreClock);
+		mqtt_client_poll(&g_mqtt_client, simulated_tick_ms);
+
+		/* 50ms tick */
+		SDK_DelayAtLeastUs(50000U, SystemCoreClock);
+		simulated_tick_ms += 50;
 	}
 
 	return 0;
