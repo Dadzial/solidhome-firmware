@@ -40,8 +40,18 @@
 #define MQTT_BROKER_PORT       1883
 #define MQTT_CLIENT_ID         "solidhome_nxp_board"
 #define MQTT_TOPIC_LIGHTS_SET  "solidhome/api/lights/set"
+#define MQTT_TOPIC_HEARTBEAT   "solidhome/api/board/heartbeat"
+#define HEARTBEAT_INTERVAL_MS  5000U
 
 static mqtt_client_t g_mqtt_client;
+static uint32_t s_last_heartbeat_ms = 0;
+
+/** Sprzętowy licznik milisekund SysTick */
+static volatile uint32_t g_systick_ms = 0;
+
+void SysTick_Handler(void) {
+	g_systick_ms++;
+}
 
 int main(void) {
 	BOARD_InitBootPins();
@@ -50,6 +60,9 @@ int main(void) {
 #ifndef BOARD_INIT_DEBUG_CONSOLE_PERIPHERAL
 	BOARD_InitDebugConsole();
 #endif
+
+	/* Konfiguracja sprzętowego zegara SysTick na przerwanie co 1 ms (1000 Hz) */
+	SysTick_Config(SystemCoreClock / 1000U);
 
 	/** Polaczenie z siecia */
 	wlan_init(LP_FLEXCOMM5_PERIPHERAL, AP_SSID, AP_PASSPHRASE, AP_SECURITY_MODE);
@@ -63,18 +76,21 @@ int main(void) {
 
 	if (mqtt_client_connect(&g_mqtt_client) == 0) {
 		mqtt_client_subscribe(&g_mqtt_client, MQTT_TOPIC_LIGHTS_SET, lights_mqtt_handler);
+		mqtt_client_publish(&g_mqtt_client, MQTT_TOPIC_HEARTBEAT, "{\"status\":\"online\"}");
+		s_last_heartbeat_ms = g_systick_ms;
 	}
 
 	PRINTF("Starting event loop...\r\n");
 
-	uint32_t simulated_tick_ms = 0;
-
 	while (1) {
-		mqtt_client_poll(&g_mqtt_client, simulated_tick_ms);
+		uint32_t now = g_systick_ms;
 
-		/* 50ms tick */
-		SDK_DelayAtLeastUs(50000U, SystemCoreClock);
-		simulated_tick_ms += 50;
+		mqtt_client_poll(&g_mqtt_client, now);
+
+		if (g_mqtt_client.connected && (now - s_last_heartbeat_ms >= HEARTBEAT_INTERVAL_MS)) {
+			mqtt_client_publish(&g_mqtt_client, MQTT_TOPIC_HEARTBEAT, "{\"status\":\"online\"}");
+			s_last_heartbeat_ms = now;
+		}
 	}
 
 	return 0;
