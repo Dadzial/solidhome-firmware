@@ -14,6 +14,7 @@
 #define MQTT_MAX_PACKET_SIZE 1024
 #define MQTT_DEFAULT_KEEPALIVE_SEC 60
 #define MQTT_PING_INTERVAL_MS 25000
+#define MQTT_RECONNECT_INTERVAL_MS 5000
 #define MQTT_MAX_SUBSCRIPTIONS 8
 
 /* Typ funkcji zwrotnej wywolywanej po odebraniu wiadomosci */
@@ -34,6 +35,7 @@ typedef struct {
     bool connected;
     uint32_t last_activity_ms;
     uint32_t last_ping_ms;
+    uint32_t last_reconnect_ms;
     mqtt_subscription_t subscriptions[MQTT_MAX_SUBSCRIPTIONS];
     uint8_t sub_count;
 } mqtt_client_t;

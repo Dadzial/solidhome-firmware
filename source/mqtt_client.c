@@ -263,6 +263,11 @@ int mqtt_client_poll(mqtt_client_t *client, uint32_t current_time_ms) {
     if (!client) return -1;
 
     if (!client->connected) {
+        if (current_time_ms - client->last_reconnect_ms < MQTT_RECONNECT_INTERVAL_MS) {
+            return -1;
+        }
+        client->last_reconnect_ms = current_time_ms;
+
         PRINTF("[MQTT] Connection lost, retrying...\r\n");
         if (mqtt_client_connect(client) == 0) {
             for (int i = 0; i < client->sub_count; i++) {
